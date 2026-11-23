@@ -1,0 +1,12 @@
+{
+  "label": "duet-07",
+  "port": 8807,
+  "login_url": "http://127.0.0.1:8807/login",
+  "http_status": 200,
+  "checks": [
+    "含登录相关文案",
+    "含密码表单线索"
+  ],
+  "passed": true,
+  "checked_at": "2026-11-24T03:06:36+08:00"
+}
