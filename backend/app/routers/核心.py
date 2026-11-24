@@ -3,6 +3,14 @@ from app.services import 目录, 左装载, 右装载, 对齐, 结论, 夹具, �
 
 路由 = APIRouter()
 
+
+def _升格():
+    from app.modules import 悬账升格回正
+    return 悬账升格回正
+
+
+_升格模块 = _升格()
+
 @路由.get("/api/概览")
 def api_概览():
     return 目录.概览()
@@ -35,6 +43,59 @@ def api_差():
 def api_悬():
     return 目录.悬列表()
 
+
+@路由.get("/api/悬账升格")
+def api_升格列表():
+    return _升格模块.列表()
+
+
+@路由.get("/api/悬账升格/策略")
+def api_升格策略():
+    return _升格模块.策略卡片()
+
+
+@路由.get("/api/悬账升格/读")
+def api_升格读(业务键: str, 超时秒: int | None = None):
+    return _升格模块.读升格(业务键, 超时秒)
+
+
+@路由.get("/api/悬账升格/{key}")
+def api_升格读路径(key: str, 超时秒: int | None = None):
+    # 路径参数名须 ASCII：Starlette 的 {参数} 只认 [a-zA-Z_][a-zA-Z0-9_]*
+    return _升格模块.读升格(key, 超时秒)
+
+
+@路由.post("/api/悬账升格/扫描")
+def api_升格扫描(体: dict | None = None):
+    try:
+        return _升格模块.扫描(体 or {})
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@路由.post("/api/悬账升格/晋升")
+def api_升格晋升(体: dict | None = None):
+    try:
+        return _升格模块.晋升(体 or {})
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@路由.post("/api/悬账升格/人工回正")
+def api_人工回正(体: dict | None = None):
+    try:
+        return _升格模块.人工回正(体 or {})
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@路由.post("/api/悬账升格/补齐对边")
+def api_补齐对边(体: dict | None = None):
+    try:
+        return _升格模块.补齐对边(体 or {})
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
 @路由.get("/api/对拍结论")
 def api_结论列表():
     return 目录.结论列表()
@@ -51,19 +112,19 @@ def api_左装(体: dict):
 def api_右装(体: dict):
     return 右装载.装一批(体)
 
-@路由.post("/api/左轨/夹具/{名}")
-def api_左夹(名: str):
+@路由.post("/api/左轨/夹具/{name}")
+def api_左夹(name: str):
     try:
-        return 左装载.装一批(夹具.读取(名))
+        return 左装载.装一批(夹具.读取(name))
     except FileNotFoundError:
-        raise HTTPException(404, 名)
+        raise HTTPException(404, name)
 
-@路由.post("/api/右轨/夹具/{名}")
-def api_右夹(名: str):
+@路由.post("/api/右轨/夹具/{name}")
+def api_右夹(name: str):
     try:
-        return 右装载.装一批(夹具.读取(名))
+        return 右装载.装一批(夹具.读取(name))
     except FileNotFoundError:
-        raise HTTPException(404, 名)
+        raise HTTPException(404, name)
 
 @路由.post("/api/对齐/跑")
 def api_对齐():

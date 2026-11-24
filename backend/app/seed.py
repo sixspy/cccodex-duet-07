@@ -48,8 +48,40 @@ CREATE TABLE IF NOT EXISTS 悬账单 (
   金额分 INTEGER NOT NULL,
   事件编号 TEXT NOT NULL DEFAULT '',
   原因 TEXT NOT NULL,
-  时刻 TEXT NOT NULL
+  时刻 TEXT NOT NULL,
+  状态 TEXT NOT NULL DEFAULT '挂起',
+  升格形态 TEXT NOT NULL DEFAULT '',
+  升格键 TEXT NOT NULL DEFAULT '',
+  升格时刻 TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS 升格旁路账册 (
+  旁路键 TEXT PRIMARY KEY,
+  业务键 TEXT NOT NULL,
+  悬边 TEXT NOT NULL,
+  金额分 INTEGER NOT NULL,
+  事件编号 TEXT NOT NULL DEFAULT '',
+  悬账时刻 TEXT NOT NULL,
+  升格时悬龄秒 INTEGER NOT NULL DEFAULT 0,
+  有效 INTEGER NOT NULL DEFAULT 1,
+  升格时刻 TEXT NOT NULL,
+  说明 TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS 唯一旁路有效 ON 升格旁路账册(业务键) WHERE 有效=1;
+CREATE TABLE IF NOT EXISTS 影子草稿 (
+  影子键 TEXT PRIMARY KEY,
+  业务键 TEXT NOT NULL,
+  悬边 TEXT NOT NULL,
+  金额分 INTEGER NOT NULL,
+  事件编号 TEXT NOT NULL DEFAULT '',
+  悬账时刻 TEXT NOT NULL,
+  升格时悬龄秒 INTEGER NOT NULL DEFAULT 0,
+  有效 INTEGER NOT NULL DEFAULT 1,
+  升格时刻 TEXT NOT NULL,
+  晋升时刻 TEXT NOT NULL DEFAULT '',
+  说明 TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS 唯一影子有效 ON 影子草稿(业务键) WHERE 有效=1;
+CREATE INDEX IF NOT EXISTS 索引悬账业务键 ON 悬账单(业务键);
 CREATE TABLE IF NOT EXISTS 对拍结论 (
   编号 INTEGER PRIMARY KEY AUTOINCREMENT,
   时刻 TEXT NOT NULL,
@@ -73,19 +105,43 @@ def 此刻() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# 老库升级：CREATE TABLE IF NOT EXISTS 不会补列，这里显式补齐升格相关列。
+_悬账单补列 = {
+    "状态": "TEXT NOT NULL DEFAULT '挂起'",
+    "升格形态": "TEXT NOT NULL DEFAULT ''",
+    "升格键": "TEXT NOT NULL DEFAULT ''",
+    "升格时刻": "TEXT NOT NULL DEFAULT ''",
+}
+
+
+def _补列(conn) -> None:
+    for 列, 定义 in _悬账单补列.items():
+        try:
+            conn.execute(f"ALTER TABLE 悬账单 ADD COLUMN {列} {定义}")
+        except Exception:
+            pass  # 已存在
+    conn.commit()
+
+
 def 初始化库() -> None:
     conn = 连接()
     conn.executescript(建表)
+    _补列(conn)
     if conn.execute("SELECT COUNT(*) AS c FROM 轨规").fetchone()["c"] == 0:
         for k, v in {
             "站名": "对拍",
             "对齐键": "业务键",
             "金额容差分": "0",
+            "悬账超时秒": "60",
+            "悬账升格形态": "影子",
             "骨架": "左轨装载→右轨装载→同键对齐落差→单边悬账→对拍结论",
             "皮": "支付渠道回执 vs 核心记账",
             "去皮": "双源键对齐管道",
         }.items():
             conn.execute("INSERT INTO 轨规(键, 值) VALUES (?, ?)", (k, v))
+    # 老库补默认口径（不覆盖已有值）
+    for k, v in {"悬账超时秒": "60", "悬账升格形态": "影子"}.items():
+        conn.execute("INSERT OR IGNORE INTO 轨规(键, 值) VALUES (?, ?)", (k, v))
     if conn.execute("SELECT COUNT(*) AS c FROM 源登记").fetchone()["c"] == 0:
         conn.execute(
             "INSERT INTO 源登记(源键,轨别,名称,说明) VALUES (?,?,?,?)",

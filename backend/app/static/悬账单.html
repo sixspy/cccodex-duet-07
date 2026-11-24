@@ -19,6 +19,7 @@
           <a href="/右轨.html">右轨流水</a>
           <a href="/对齐差.html">对齐差表</a>
           <a href="/悬账单.html" class="亮">悬账单</a>
+          <a href="/悬账升格.html">悬账升格</a>
           <a href="/对拍结论.html">对拍结论</a>
           <a href="/源登记.html">源登记</a>
           <a href="/轨规.html">轨规</a>
@@ -28,24 +29,51 @@
 
       <section class="行卡">
         <h1>悬账单</h1>
-        <p class="说明">对齐后仅单边有键（或需人工处理）的业务键。不是闸对/缝包那种「旁路匣」命名。</p>
+        <p class="说明">对齐后仅单边有键（或需人工处理）的业务键。不是闸对/缝包那种「旁路匣」命名。超时升格见「悬账升格」页：旁路终态不再自动对齐，影子补齐后原子晋升回现行对齐。</p>
+        <div id="策略"></div>
         <div class="工具条"><button class="次" id="刷">刷新</button></div>
       </section>
       <section class="行卡"><div id="表"></div></section>
+      <section class="行卡">
+        <h2>详情</h2>
+        <div id="详"></div>
+      </section>
 
     </main>
   </div>
   <script src="/common.js"></script>
   <script>
 (async () => {
+  let 行 = [];
+  const 详情 = async (键) => {
+    const v = await get("/api/悬账升格/读?业务键=" + encodeURIComponent(键));
+    document.getElementById("详").innerHTML = 统计([
+      ["业务键", v.业务键], ["悬龄秒", v.悬龄秒], ["状态", v.状态],
+      ["形态", v.升格形态 || "-"], ["valid", v.valid ? "是" : "否"],
+      ["可自动对齐", v.可自动对齐 ? "是" : "否"], ["可晋升", v.可晋升 ? "是" : "否"]
+    ]) + `<p class="说明 mt8">${v.结论}${v.不可对齐原因 ? "（" + v.不可对齐原因 + "）" : ""}</p>
+      <pre class="报 mt8">${JSON.stringify({旁路键: v.旁路键, 影子键: v.影子键, 悬账单: v.悬账单, 对齐差: v.对齐差}, null, 2)}</pre>`;
+  };
   const paint = async () => {
-    const rows = await get("/api/悬账单");
+    const d = await get("/api/悬账升格");
+    行 = d.悬账;
+    const s = d.策略;
+    document.getElementById("策略").innerHTML = 统计([
+      ["超时秒", s.超时秒], ["默认形态", s.默认形态], ["挂起", s.悬账挂起],
+      ["已升格", s.悬账已升格], ["已回正", s.悬账已回正],
+      ["旁路有效", s.旁路有效], ["影子有效", s.影子有效], ["影子可晋升", s.影子可晋升]
+    ]);
     document.getElementById("表").innerHTML = 表(
-      ["编号","业务键","悬边","金额分","事件编号","原因","时刻"],
-      rows,
+      ["编号","业务键","悬边","金额分","事件编号","原因","状态","形态","悬龄秒","时刻","详情"],
+      d.悬账,
       r => `<td>${r.编号}</td><td>${r.业务键}</td><td>${徽(r.悬边)}</td><td>${r.金额分}</td>
-        <td>${r.事件编号||"-"}</td><td>${r.原因}</td><td>${r.时刻}</td>`
+        <td>${r.事件编号||"-"}</td><td>${r.原因}</td><td>${徽(r.状态)}</td>
+        <td>${r.升格形态||"-"}</td><td>${r.悬龄秒}${r.是否超时 ? " " + 徽("超时") : ""}</td>
+        <td>${r.时刻}</td><td><button class="次" data-键="${r.业务键}">详情</button></td>`
     );
+    document.querySelectorAll("#表 [data-键]").forEach(b => {
+      b.onclick = () => 详情(b.getAttribute("data-键"));
+    });
   };
   await paint();
   document.getElementById("刷").onclick = paint;

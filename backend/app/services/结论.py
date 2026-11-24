@@ -15,13 +15,28 @@ def 跑一次() -> dict:
         差总 = conn.execute("SELECT COUNT(*) AS c FROM 对齐差").fetchone()["c"]
 
         问题 = []
-        # 悬账单业务键应能在对齐差找到左缺/右缺
-        for r in conn.execute("SELECT * FROM 悬账单").fetchall():
+        # 挂起悬账业务键应能在对齐差找到左缺/右缺；
+        # 已升格（差型=升格旁路/升格影子）与已回正是终态存档，按各自票型核。
+        # 同一业务键可能有多代悬账（回正后又重新挂起），只核最新一代。
+        最新: dict[str, object] = {}
+        for r in conn.execute("SELECT * FROM 悬账单 ORDER BY 编号").fetchall():
+            最新[r["业务键"]] = r
+        for r in 最新.values():
+            状态 = r["状态"] if "状态" in r.keys() else "挂起"
             行 = conn.execute(
-                "SELECT 差型 FROM 对齐差 WHERE 业务键=?", (r["业务键"],)
+                "SELECT 差型 FROM 对齐差 WHERE 业务键=? ORDER BY 编号 DESC LIMIT 1",
+                (r["业务键"],),
             ).fetchone()
             if not 行:
                 问题.append(f"悬账{r['业务键']}无对齐差行")
+            elif 状态 == "已升格":
+                形 = r["升格形态"]
+                期望 = "升格旁路" if 形 == "旁路" else "升格影子"
+                if 行["差型"] != 期望:
+                    问题.append(f"升格悬{r['业务键']}差型={行['差型']}期望={期望}")
+            elif 状态 == "已回正":
+                if 行["差型"] not in ("对齐", "金额不符"):
+                    问题.append(f"已回正悬{r['业务键']}差型={行['差型']}")
             elif r["悬边"] == "左" and 行["差型"] not in ("右缺", "金额不符"):
                 问题.append(f"左悬{r['业务键']}差型={行['差型']}")
             elif r["悬边"] == "右" and 行["差型"] not in ("左缺", "金额不符"):

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>悬账升格 · 对拍</title>
+  <link rel="stylesheet" href="/styles.css"/>
+</head>
+<body>
+  <div class="壳">
+    <header class="顶栏">
+      <div class="顶左">
+        <div class="牌名">对拍</div>
+        <div class="牌骨">左轨装载 → 右轨装载 → 同键对齐落差 → 单边悬账 → 对拍结论</div>
+      </div>
+      <nav class="管线">
+          <a href="/">对拍台</a>
+          <a href="/左轨.html">左轨流水</a>
+          <a href="/右轨.html">右轨流水</a>
+          <a href="/对齐差.html">对齐差表</a>
+          <a href="/悬账单.html">悬账单</a>
+          <a href="/悬账升格.html" class="亮">悬账升格</a>
+          <a href="/对拍结论.html">对拍结论</a>
+          <a href="/源登记.html">源登记</a>
+          <a href="/轨规.html">轨规</a>
+      </nav>
+    </header>
+    <main class="主">
+
+      <section class="行卡">
+        <h1>悬账升格回正</h1>
+        <p class="说明">超时悬账须择定升格形态。<b>旁路账册终态</b>：悬行改「已升格」写入旁路账册，不再参与自动对齐；<b>影子草稿待回正</b>：悬行进影子草稿只读，补齐对边后原子晋升回现行对齐。悬账单与对齐差同票，升格与补齐并发只落一边。</p>
+        <div id="策略"></div>
+      </section>
+
+      <section class="行卡">
+        <h2>超时扫描升格</h2>
+        <div class="工具条">
+          <label>超时秒 <input id="超时" style="width:90px"/></label>
+          <label>默认形态
+            <select id="形态">
+              <option value="影子">影子（待补齐晋升）</option>
+              <option value="旁路">旁路（终态不可对齐）</option>
+            </select>
+          </label>
+          <button id="扫">扫描升格</button>
+          <button class="次" id="刷">刷新</button>
+        </div>
+        <pre class="报" id="报"></pre>
+      </section>
+
+      <section class="行卡">
+        <h2>只读：按业务键读升格</h2>
+        <div class="工具条">
+          <label>业务键 <input id="键" style="width:180px"/></label>
+          <button class="次" id="读">读</button>
+        </div>
+        <div id="读表"></div>
+      </section>
+
+      <section class="行卡">
+        <h2>悬账扫描（超时 / 挂起 / 升格形态）</h2>
+        <div id="悬表"></div>
+      </section>
+
+      <section class="行卡 双栏">
+        <div>
+          <h2>升格旁路账册（终态）</h2>
+          <div id="旁表"></div>
+        </div>
+        <div>
+          <h2>影子草稿（只读待回正）</h2>
+          <div id="影表"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+  <script src="/common.js"></script>
+  <script>
+(async () => {
+  const 形名 = v => v === "旁路" ? "旁路终态" : (v === "影子" ? "影子待回正" : (v || "-"));
+  const paint = async () => {
+    const d = await get("/api/悬账升格");
+    const s = d.策略;
+    document.getElementById("策略").innerHTML = 统计([
+      ["超时秒", s.超时秒], ["默认形态", s.默认形态],
+      ["挂起", s.悬账挂起], ["已升格", s.悬账已升格], ["已回正", s.悬账已回正],
+      ["旁路有效", s.旁路有效], ["影子有效", s.影子有效], ["影子可晋升", s.影子可晋升]
+    ]) + `<p class="说明 mt8">${s.口径}</p>`;
+
+    document.getElementById("悬表").innerHTML = 表(
+      ["编号","业务键","悬边","金额分","悬龄秒","超时","状态","形态","可自动对齐","升格键","时刻"],
+      d.悬账,
+      r => `<td>${r.编号}</td><td>${r.业务键}</td><td>${徽(r.悬边)}</td><td>${r.金额分}</td>
+        <td>${r.悬龄秒}</td><td>${r.是否超时 ? 徽("超时") : "否"}</td>
+        <td>${徽(r.状态)}</td><td>${形名(r.升格形态)}</td>
+        <td>${r.可自动对齐 ? 徽("可对齐") : 徽("不可对齐")}</td>
+        <td>${r.升格键||"-"}</td><td>${r.时刻}</td>`
+    );
+
+    document.getElementById("旁表").innerHTML = 表(
+      ["旁路键","业务键","悬边","金额分","升格时悬龄秒","有效","升格时刻","说明"],
+      d.旁路账册,
+      r => `<td>${r.旁路键}</td><td>${r.业务键}</td><td>${徽(r.悬边)}</td><td>${r.金额分}</td>
+        <td>${r.升格时悬龄秒}</td><td>${徽(r.有效 ? "有效" : "失效")}</td><td>${r.升格时刻}</td><td>${r.说明}</td>`
+    );
+
+    document.getElementById("影表").innerHTML = 表(
+      ["影子键","业务键","悬边","金额分","升格时悬龄秒","有效","晋升时刻","说明"],
+      d.影子草稿,
+      r => `<td>${r.影子键}</td><td>${r.业务键}</td><td>${徽(r.悬边)}</td><td>${r.金额分}</td>
+        <td>${r.升格时悬龄秒}</td><td>${徽(r.有效 ? "有效" : "失效")}</td><td>${r.晋升时刻||"-"}</td><td>${r.说明}</td>`
+    );
+  };
+  await paint();
+  const 规 = await get("/api/悬账升格/策略");
+  document.getElementById("超时").value = 规.超时秒;
+  document.getElementById("形态").value = 规.默认形态;
+  document.getElementById("扫").onclick = async () => {
+    const body = { 超时秒: Number(document.getElementById("超时").value), 形态: document.getElementById("形态").value };
+    document.getElementById("报").textContent = JSON.stringify(await post("/api/悬账升格/扫描", body), null, 2);
+    await paint();
+  };
+  document.getElementById("刷").onclick = paint;
+  document.getElementById("读").onclick = async () => {
+    const k = document.getElementById("键").value.trim();
+    if (!k) return;
+    const v = await get("/api/悬账升格/读?业务键=" + encodeURIComponent(k));
+    document.getElementById("读表").innerHTML = 表(
+      ["业务键","悬龄秒","超时","状态","形态","旁路键","影子键","valid","可自动对齐","可晋升","结论"],
+      [v],
+      r => `<td>${r.业务键}</td><td>${r.悬龄秒}</td><td>${r.是否超时 ? 徽("超时") : "否"}</td>
+        <td>${徽(r.状态)}</td><td>${形名(r.升格形态)}</td><td>${r.旁路键||"-"}</td>
+        <td>${r.影子键||"-"}</td><td>${徽(r.valid)}</td>
+        <td>${r.可自动对齐 ? 徽("可对齐") : 徽("不可对齐")}</td>
+        <td>${r.可晋升 ? 徽("可晋升") : "否"}</td><td>${r.结论}</td>`
+    );
+  };
+})();
+</script>
+</body>
+</html>
